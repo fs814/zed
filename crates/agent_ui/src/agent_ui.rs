@@ -355,6 +355,19 @@ pub struct NewExternalAgentThread {
     agent: AgentId,
 }
 
+/// Opens a new external agent thread with a prefilled prompt, optionally
+/// appending the active editor's selection to the prompt.
+#[derive(Clone, PartialEq, Deserialize, JsonSchema, Action)]
+#[action(namespace = agent)]
+#[serde(deny_unknown_fields)]
+pub struct SendPromptToAgent {
+    #[serde(deserialize_with = "deserialize_external_agent_id")]
+    agent: AgentId,
+    message: String,
+    #[serde(default)]
+    append_selection: bool,
+}
+
 fn deserialize_external_agent_id<'de, D>(deserializer: D) -> Result<AgentId, D::Error>
 where
     D: serde::Deserializer<'de>,

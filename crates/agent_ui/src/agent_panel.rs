@@ -54,7 +54,7 @@ use crate::{
 };
 use crate::{
     Agent, AgentInitialContent, AgentThreadSource, ExternalSourcePrompt, NewExternalAgentThread,
-    NewNativeAgentThreadFromSummary,
+    NewNativeAgentThreadFromSummary, SendPromptToAgent,
 };
 use agent_settings::AgentSettings;
 use ai_onboarding::AgentPanelOnboarding;
@@ -65,7 +65,7 @@ use chrono::{DateTime, Utc};
 use client::{UserStore, zed_urls};
 use cloud_api_types::Plan;
 use collections::HashMap;
-use editor::{Editor, MultiBuffer};
+use editor::{Editor, MultiBuffer, MultiBufferOffset};
 use extension_host::ExtensionStore;
 
 use fs::Fs;
@@ -400,6 +400,35 @@ pub fn init(cx: &mut App) {
                         workspace.focus_panel::<AgentPanel>(window, cx);
                         panel.update(cx, |panel, cx| {
                             panel.new_external_agent_thread(action, window, cx);
+                        });
+                    }
+                })
+                .register_action(|workspace, action: &SendPromptToAgent, window, cx| {
+                    let selection_text = if action.append_selection {
+                        workspace.active_item_as::<Editor>(cx).and_then(|editor| {
+                            editor.update(cx, |editor, cx| {
+                                let display_snapshot = editor.display_snapshot(cx);
+                                let buffer_snapshot =
+                                    editor.buffer().read(cx).snapshot(cx);
+                                let range = editor
+                                    .selections
+                                    .newest::<MultiBufferOffset>(&display_snapshot)
+                                    .range();
+                                if range.is_empty() {
+                                    None
+                                } else {
+                                    Some(buffer_snapshot.text_for_range(range).collect::<String>())
+                                }
+                            })
+                        })
+                    } else {
+                        None
+                    };
+
+                    if let Some(panel) = workspace.panel::<AgentPanel>(cx) {
+                        workspace.focus_panel::<AgentPanel>(window, cx);
+                        panel.update(cx, |panel, cx| {
+                            panel.send_prompt_to_agent(action, selection_text, window, cx);
                         });
                     }
                 })
@@ -1814,6 +1843,35 @@ impl AgentPanel {
 
         self.selected_agent = action.agent.clone().into();
         self.activate_new_thread(true, AgentThreadSource::AgentPanel, window, cx);
+    }
+
+    pub fn send_prompt_to_agent(
+        &mut self,
+        action: &SendPromptToAgent,
+        selection_text: Option<String>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.has_open_project(cx) {
+            return;
+        }
+
+        let mut final_prompt = action.message.clone();
+        if action.append_selection {
+            if let Some(sel) = selection_text {
+                if !sel.trim().is_empty() {
+                    final_prompt.push_str("\n\n");
+                    final_prompt.push_str(&sel);
+                }
+            }
+        }
+
+        let Some(prompt) = ExternalSourcePrompt::new(&final_prompt) else {
+            return;
+        };
+
+        self.selected_agent = action.agent.clone().into();
+        self.new_agent_thread_with_external_source_prompt(Some(prompt), window, cx);
     }
 
     pub fn new_terminal(
