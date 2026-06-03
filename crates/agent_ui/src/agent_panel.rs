@@ -44,10 +44,11 @@ use crate::terminal_thread_metadata_store::{
 };
 use crate::thread_metadata_store::{ThreadId, ThreadMetadataStore, ThreadMetadataStoreEvent};
 use crate::{
-    AddContextServer, AgentDiffPane, ConversationView, CopyThreadToClipboard, Follow,
-    LoadThreadFromClipboard, NewTerminalThread, NewThread, OpenActiveThreadAsMarkdown,
-    OpenAgentDiff, ResetFastModeWarnings, ResetTrialEndUpsell, ResetTrialUpsell,
-    ShowAllSidebarThreadMetadata, ShowThreadMetadata, ToggleNewThreadMenu, ToggleOptionsMenu,
+    AddContextServer, AgentDiffPane, ConversationView, CopyThreadToClipboard, FocusDown,
+    FocusLeft, FocusRight, FocusUp, Follow, LoadThreadFromClipboard, NewTerminalThread, NewThread,
+    OpenActiveThreadAsMarkdown, OpenAgentDiff, ResetFastModeWarnings, ResetTrialEndUpsell,
+    ResetTrialUpsell, ShowAllSidebarThreadMetadata, ShowThreadMetadata, ToggleNewThreadMenu,
+    ToggleOptionsMenu,
     agent_configuration::{AgentConfiguration, AssistantConfigurationEvent},
     conversation_view::{AcpThreadViewEvent, ThreadView, reset_fast_mode_warnings},
     ui::{AgentNotification, AgentNotificationEvent, EndTrialUpsell},
@@ -387,6 +388,33 @@ pub fn init(cx: &mut App) {
                     if let Some(panel) = workspace.panel::<AgentPanel>(cx) {
                         workspace.focus_panel::<AgentPanel>(window, cx);
                         panel.update(cx, |panel, cx| panel.expand_message_editor(window, cx));
+                    }
+                })
+                .register_action(|workspace, _: &FocusUp, window, cx| {
+                    if let Some(panel) = workspace.panel::<AgentPanel>(cx) {
+                        workspace.focus_panel::<AgentPanel>(window, cx);
+                        panel.update(cx, |panel, cx| panel.focus_output(window, cx));
+                    }
+                })
+                .register_action(|workspace, _: &FocusDown, window, cx| {
+                    if let Some(panel) = workspace.panel::<AgentPanel>(cx) {
+                        workspace.focus_panel::<AgentPanel>(window, cx);
+                        panel.update(cx, |panel, cx| panel.focus_input(window, cx));
+                    }
+                })
+                .register_action(|workspace, _: &FocusLeft, window, cx| {
+                    if workspace.panel::<AgentPanel>(cx).is_some() {
+                        workspace.focus_panel::<AgentPanel>(window, cx);
+                        window.dispatch_action(
+                            zed_actions::agents_sidebar::FocusSidebarFilter.boxed_clone(),
+                            cx,
+                        );
+                    }
+                })
+                .register_action(|workspace, _: &FocusRight, window, cx| {
+                    if let Some(panel) = workspace.panel::<AgentPanel>(cx) {
+                        workspace.focus_panel::<AgentPanel>(window, cx);
+                        panel.update(cx, |panel, cx| panel.focus_input(window, cx));
                     }
                 })
                 .register_action(|workspace, _: &OpenSettings, window, cx| {
@@ -3382,6 +3410,27 @@ impl AgentPanel {
             active_thread.expand_message_editor(&ExpandMessageEditor, window, cx);
             active_thread.focus_handle(cx).focus(window, cx);
         })
+    }
+
+    /// Focus the active conversation's message editor (input box).
+    fn focus_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(conversation_view) = self.active_conversation_view() else {
+            return;
+        };
+
+        let Some(active_thread) = conversation_view.read(cx).root_thread_view() else {
+            return;
+        };
+
+        let editor_focus = active_thread.read(cx).message_editor.focus_handle(cx);
+        editor_focus.focus(window, cx);
+    }
+
+    /// Focus the agent panel itself (output transcript region).
+    /// In this state the `AcpThread` keymap context becomes most-specific, so
+    /// `up` / `down` / `pageup` / `pagedown` / `home` / `end` scroll the output.
+    fn focus_output(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.focus_handle.focus(window, cx);
     }
 
     pub fn go_back(&mut self, _: &workspace::GoBack, window: &mut Window, cx: &mut Context<Self>) {
