@@ -1,7 +1,9 @@
 mod codelldb;
+mod earlybird;
 mod gdb;
 mod go;
 mod javascript;
+mod netcoredbg;
 mod python;
 
 #[cfg(test)]
@@ -18,10 +20,12 @@ use dap::{
     },
     configure_tcp_connection,
 };
+use earlybird::EarlybirdDebugAdapter;
 use gdb::GdbDebugAdapter;
 use go::GoDebugAdapter;
 use gpui::{App, BorrowAppContext};
 use javascript::JsDebugAdapter;
+use netcoredbg::NetCoreDbgDebugAdapter;
 use python::PythonDebugAdapter;
 use serde_json::json;
 use task::{DebugScenario, ZedDebugConfig};
@@ -32,6 +36,8 @@ pub fn init(cx: &mut App) {
         registry.add_adapter(Arc::from(PythonDebugAdapter::default()));
         registry.add_adapter(Arc::from(JsDebugAdapter::default()));
         registry.add_adapter(Arc::from(GoDebugAdapter::default()));
+        registry.add_adapter(Arc::from(NetCoreDbgDebugAdapter));
+        registry.add_adapter(Arc::from(EarlybirdDebugAdapter));
         registry.add_adapter(Arc::from(GdbDebugAdapter));
 
         #[cfg(any(test, feature = "test-support"))]
