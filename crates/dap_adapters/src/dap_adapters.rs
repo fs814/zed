@@ -1,8 +1,10 @@
 mod codelldb;
 mod earlybird;
 mod gdb;
+mod gdscript;
 mod go;
 mod javascript;
+mod kotlin;
 mod netcoredbg;
 mod python;
 
@@ -22,9 +24,11 @@ use dap::{
 };
 use earlybird::EarlybirdDebugAdapter;
 use gdb::GdbDebugAdapter;
+use gdscript::GDScriptDebugAdapter;
 use go::GoDebugAdapter;
 use gpui::{App, BorrowAppContext};
 use javascript::JsDebugAdapter;
+use kotlin::KotlinDebugAdapter;
 use netcoredbg::NetCoreDbgDebugAdapter;
 use python::PythonDebugAdapter;
 use serde_json::json;
@@ -38,6 +42,8 @@ pub fn init(cx: &mut App) {
         registry.add_adapter(Arc::from(GoDebugAdapter::default()));
         registry.add_adapter(Arc::from(NetCoreDbgDebugAdapter));
         registry.add_adapter(Arc::from(EarlybirdDebugAdapter));
+        registry.add_adapter(Arc::from(GDScriptDebugAdapter));
+        registry.add_adapter(Arc::from(KotlinDebugAdapter));
         registry.add_adapter(Arc::from(GdbDebugAdapter));
 
         #[cfg(any(test, feature = "test-support"))]
